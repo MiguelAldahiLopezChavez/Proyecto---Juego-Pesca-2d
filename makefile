@@ -4,26 +4,25 @@ BIN_DIR := bin
 
 SFML := -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio -lbox2d
 
-# Obtener todos los archivos .cpp en el directorio de origen
-CPP_FILES := $(wildcard $(SRC_DIR)/*.cpp)
 
-# Generar los nombres de los archivos .exe en el directorio de destino
-EXE_FILES := $(patsubst $(SRC_DIR)/%.cpp,$(BIN_DIR)/%.exe,$(CPP_FILES))
+# Archivos fuente y ejecutable principal
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+MAIN := $(SRC_DIR)/01_Mundo.cpp
+OBJS := $(SRCS:.cpp=.o)
+TARGET := $(BIN_DIR)/01_Mundo.exe
 
-# Regla para compilar cada archivo .cpp y generar el archivo .exe correspondiente
-$(BIN_DIR)/%.exe: $(SRC_DIR)/%.cpp
-	g++ $< -o $@ $(SFML) -Iinclude
+all: $(TARGET)
 
-# Regla por defecto para compilar todos los archivos .cpp
-all: $(EXE_FILES)
+$(TARGET): $(SRCS) | $(BIN_DIR)
+	g++ $(SRCS) -o $(TARGET) $(SFML) -Iinclude
 
-# Regla para ejecutar cada archivo .exe
-run%: $(BIN_DIR)/%.exe
-	@powershell -NoProfile -Command "& '$(BIN_DIR)/$*.exe'"
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
 
-# Regla para limpiar los archivos generados
+run: $(TARGET)
+	@powershell -NoProfile -Command "& '$(TARGET)'"
+
 clean:
-	rm -f $(EXE_FILES)
+	rm -f $(BIN_DIR)/*.exe
 
-.PHONY: all clean
-.PHONY: run-%
+.PHONY: all clean run
