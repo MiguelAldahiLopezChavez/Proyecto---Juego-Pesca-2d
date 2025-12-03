@@ -4,36 +4,36 @@
 using namespace sf;
 
 class Pescador {
-public:
-    Pescador(Texture& textura);
-    void update(); // Método automático como Pikachu
-    void iniciarAnimacion();
-    Sprite& obtenerSprite();
-    void mostrarpescando();
-    int getFrameActual() const { return currentFrame; }
+    public:
+        Pescador(Texture& textura);
+        void update();
+        void iniciarAnimacion(bool bucle = true); // true: bucle, false: animación completa
+        Sprite& obtenerSprite();
+        void mostrarpescando();
+        int getFrameActual() const { return currentFrame; }
+        bool isAnimacionActiva() const { return animacionActiva; }
 
-private:
-    Sprite sprite;
-    int currentFrame;
-    int numFrames = 11;
-    Clock clock;
-    float frameTime;
-    bool animacionActiva;
-    
-    // Coordenadas FIJAS para cada frame como en el código de Pikachu
-    IntRect framesRects[11] = {
-        IntRect(0, 0, 190, 1080),      // Frame 0
-        IntRect(190, 0, 190, 1080),    // Frame 1
-        IntRect(380, 0, 190, 1080),    // Frame 2
-        IntRect(570, 0, 190, 1080),    // Frame 3
-        IntRect(760, 0, 190, 1080),    // Frame 4
-        IntRect(950, 0, 190, 1080),    // Frame 5
-        IntRect(1140, 0, 190, 1080),   // Frame 6
-        IntRect(1330, 0, 190, 1080),   // Frame 7
-        IntRect(1520, 0, 190, 1080),   // Frame 8
-        IntRect(1710, 0, 190, 1080),   // Frame 9
-        IntRect(1900, 0, 190, 1080)    // Frame 10
-    };
+    private:
+        Sprite sprite;
+        int currentFrame;
+        int numFrames = 11;
+        Clock clock;
+        float frameTime;
+        bool animacionActiva;
+        bool modoBucle = true;
+        IntRect framesRects[11] = {
+            IntRect(0, 0, 155, 500),      // Frame 0
+            IntRect(155, 0, 155, 500),    // Frame 1
+            IntRect(310, 0, 155, 500),    // Frame 2
+            IntRect(465, 0, 155, 500),    // Frame 3
+            IntRect(620, 0, 155, 500),    // Frame 4
+            IntRect(775, 0, 155, 500),    // Frame 5
+            IntRect(930, 0, 155, 500),   // Frame 6
+            IntRect(1085, 0, 155, 500),   // Frame 7
+            IntRect(1240, 0, 155, 500),   // Frame 8
+            IntRect(1395, 0, 155, 500),   // Frame 9
+            IntRect(1550, 0, 155, 500),    // Frame  10 
+        };
 };
 
 #endif
