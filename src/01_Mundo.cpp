@@ -22,9 +22,9 @@ int main()
      spritePezMec.setScale(escalaPezMec, escalaPezMec);
 
     // Crear rectángulo verde (más alargado en Y)
-    RectangleShape cuadradoVerdeShape(Vector2f(90, 180)); // Más alto que ancho
+    RectangleShape cuadradoVerdeShape(Vector2f(90, 120)); // Más alto que ancho
     cuadradoVerdeShape.setFillColor(Color::Green);
-    cuadradoVerdeShape.setOrigin(45, 90); // Centrar el origen (mitad del tamaño)
+    cuadradoVerdeShape.setOrigin(45, 60); // Centrar el origen (mitad del tamaño)
 
     Texture mecanica_juego;
          if (!mecanica_juego.loadFromFile("assets/imagen/nuevaimagen/mecanica_juego_principal_2.png")) 
@@ -63,18 +63,14 @@ int main()
         
             return -1;
         }
+
     
-        Texture mecanica;
-        if (!mecanica.loadFromFile("assets/imagen/nuevaimagen/mecanica_juego_principal.png")) 
-        {
-        
-            return -1;
-        }
 
 
     Vector2u size = fondo.getSize();
     unsigned int anchoVentana = size.x;
     unsigned int altoVentana = size.y;
+
 
     // Posicionar la mecánica de juego: centrada en Y, a la izquierda en X
     Vector2u sizeMecanica = mecanica_juego.getSize();
@@ -97,11 +93,12 @@ int main()
     // Variables para movimiento simple del pez
     float pezPosX = 0.0f;
     float pezPosY = 0.0f;
-    float pezVelocidadY = 0.5f; // Velocidad inicial
+    // Velocidades del pez en píxeles/segundo (con movimiento escalado por dt)
+    float pezVelocidadY = 200.0f; // Velocidad inicial
     float pezDireccion = 1.0f; // 1 = abajo, -1 = arriba
-    float pezVelocidadCambio = 0.04f; // Qué tan rápido cambia la velocidad
-    float pezVelocidadMin = 0.5f;
-    float pezVelocidadMax = 1.7f;
+    float pezVelocidadCambio = 100.0f; // Magnitud del cambio aleatorio (se multiplica por dt)
+    float pezVelocidadMin = 200.0f;
+    float pezVelocidadMax = 1000.0f;
     
     // Variables para control del salto
     bool mousePresionado = false; 
@@ -121,10 +118,10 @@ int main()
     // Sistema de reto: 15s para acumular 3s de contacto pez-rectángulo
     bool retoActivo = false;
     bool retoGanado = false;
-    float tiempoRetoTotal = 15.0f;
+    float tiempoRetoTotal = 10.0f;
     float tiempoRetoRestante = 0.0f;
     float tiempoContactoAcumulado = 0.0f;
-    float tiempoContactoNecesario = 3.0f;
+    float tiempoContactoNecesario = 5.0f;
     Clock relojReto;
 
 
@@ -133,9 +130,17 @@ int main()
 
     Text mostrarTexto;
     Text mostrarTexto1;
-    // HUD del reto
-    Text hudRetoTiempo;       // Esquina superior derecha: tiempo restante
-    Text hudContactoTiempo;   // Mitad lado derecho: tiempo de contacto acumulado
+    Text hudRetoTiempo;       
+    Text hudContactoTiempo;   
+    Text infoJuego;
+    Text mensajeReto;         // Mensaje grande de resultado (ganado/fallido)
+    // Recompensas
+    RewardManager recompensaManager;
+    const Reward* recompensaSeleccionada = nullptr;
+    // Carga directa alternativa por ruta
+    Texture recompensaTexture;
+    Sprite recompensaSprite;
+    Text textoRecompensaNombre;
 
     Clock reloj;
     bool mostrarTexto1Visible = true;
@@ -155,27 +160,34 @@ int main()
     mostrarTexto1.setFillColor(Color::White);
     mostrarTexto1.setPosition(anchoVentana/2 -180, altoVentana/2 + 70);
 
-    // Inicializar HUD del reto con la misma fuente
     hudRetoTiempo.setFont(texto.getFont());
     hudRetoTiempo.setCharacterSize(40);
     hudRetoTiempo.setFillColor(Color::White);
-    // Posición: esquina superior derecha con margen
-    hudRetoTiempo.setPosition(anchoVentana - 325, 320);
+    hudRetoTiempo.setPosition(anchoVentana - 375, 320);
 
     hudContactoTiempo.setFont(texto.getFont());
     hudContactoTiempo.setCharacterSize(50);
     hudContactoTiempo.setFillColor(Color::White);
-    // Posición: medio del lado derecho
     hudContactoTiempo.setPosition(anchoVentana - 400, altoVentana / 2 - 14);
+    
+    infoJuego.setFont(texto.getFont());
+    infoJuego.setString("\t\t\t\t\tUsa SPACE para pescar\nUsa UP o clic izquierdo para mover rectangulo verde");
+    infoJuego.setCharacterSize(20);
+    infoJuego.setFillColor(Color::White);
+    infoJuego.setPosition((anchoVentana/2) - 275, 50);
+
+    mensajeReto.setFont(texto.getFont());
+    mensajeReto.setCharacterSize(72);
+    mensajeReto.setFillColor(Color::White);
+    mensajeReto.setString("");
 
     RenderWindow window(VideoMode(anchoVentana, altoVentana), "Juego de Pesca 2D");
     iniciarMusicaJuego("assets/Musica/Troubadeck 25 Deep Dark Sea.ogg");
 
-    //Pez pez1("assets/imagen/op3/peces/nemo/nemo.png", 100, 100, 1, 0);
     Sprite spriteFondo(fondo);
     Sprite spriteFondo2(fondo2);
 
-    enum EstadoPantalla { INICIO, TRANSICION, JUEGO };
+    enum EstadoPantalla { INICIO, TRANSICION, JUEGO, VICTORIA, DERROTA, RECOMPENSAS };
     EstadoPantalla estado = INICIO;
 
     int opacidad = 0;
@@ -198,12 +210,62 @@ int main()
                 estado = TRANSICION;
                 opacidad = 0; // Inicializa opacidad solo al entrar en transición
             }
+            // Reiniciar reto con Enter cuando el reto terminó (ganado o perdido) y estamos en JUEGO
+            if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
+                if (!retoActivo && mostrarPezFisico) {
+                    retoActivo = true;
+                    retoGanado = false;
+                    tiempoRetoRestante = tiempoRetoTotal;
+                    tiempoContactoAcumulado = 0.0f;
+                    mensajeReto.setString("");
+                }
+            }
+            // Salir de pantalla de recompensas con Enter
+            if (estado == RECOMPENSAS && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
+                // Iniciar transición de vuelta al juego
+                estado = TRANSICION;
+                opacidad = 0; // Reiniciar transición
+                recompensaSeleccionada = nullptr;
+                mensajeReto.setString("");
+                // Resetear animación del pescador para volver al inicio
+                animacionTerminada = false;
+                mostrarPezFisico = false;
+                bucleFinalIniciado = false;
+                animacionBucleIniciada = false;
+                pescador.currentFrame = 3;
+                // Limpiar variables del reto
+                retoActivo = false;
+                retoGanado = false;
+                tiempoRetoRestante = 0.0f;
+                tiempoContactoAcumulado = 0.0f;
+                cuadradoInicializado = false;
+            }
+            // Continuar desde VICTORIA a RECOMPENSAS
+            if (estado == VICTORIA && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
+                estado = RECOMPENSAS;
+            }
+            // Continuar desde DERROTA de vuelta al juego
+            if (estado == DERROTA && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
+                // Resetear al estado inicial del juego
+                estado = TRANSICION;
+                opacidad = 0;
+                // Resetear animación del pescador para volver al inicio
+                animacionTerminada = false;
+                mostrarPezFisico = false;
+                bucleFinalIniciado = false;
+                animacionBucleIniciada = false;
+                pescador.currentFrame = 3;
+                // Limpiar variables del reto
+                retoActivo = false;
+                retoGanado = false;
+                tiempoRetoRestante = 0.0f;
+                tiempoContactoAcumulado = 0.0f;
+                cuadradoInicializado = false;
+                mensajeReto.setString("");
+            }
             // Control de animación del pescador (solo SPACE)
             if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Space) {
-                std::cout << "SPACE PRESIONADO - Control pescador!" << std::endl;
                 if (!animacionTerminada || !mostrarPezFisico) {
-                    // Si no está en la mecánica, resetear/iniciar animación
-                    std::cout << "Reseteando/iniciando animación del pescador" << std::endl;
                     animacionTerminada = false;
                     mostrarPezFisico = false;
                     bucleFinalIniciado = false;
@@ -215,11 +277,8 @@ int main()
             // Control de salto del cuadrado verde (UP arrow y mouse click)
             if (estado == JUEGO && ((event.type == Event::KeyPressed && event.key.code == Keyboard::Up) ||
                 (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left))) {
-                std::cout << "SALTO CUADRADO DETECTADO!" << std::endl;
                 if (animacionTerminada && mostrarPezFisico && cuadradoInicializado) {
-                    // Aplicar impulso hacia arriba (contrarrestar gravedad)
                     cuadradoVelocidadY = cuadradoFuerzaSalto;
-                    std::cout << "¡¡¡SALTO APLICADO!!! Nueva velocidad Y: " << cuadradoVelocidadY << std::endl;
                 }
             }
         }
@@ -250,6 +309,10 @@ if (estado == INICIO) {
             }
             pescador.update();
             window.draw(pescador.obtenerSprite());
+            // Mostrar infoJuego mientras aún no termina la animación del pescador
+            if (!animacionTerminada) {
+                window.draw(infoJuego);
+            }
             
             // Las físicas simples del pez se manejan directamente cuando aparece
             
@@ -258,14 +321,8 @@ if (estado == INICIO) {
             if (!animacionTerminada && pescador.isEnBucleFinal()) {
                 animacionTerminada = true;
                 timerAnimacion.restart();
-                std::cout << "Animacion terminada, iniciando timer" << std::endl;
             }
-            
-            // Debug: mostrar estado actual
-            if (!animacionTerminada) {
-                std::cout << "Frame actual: " << pescador.getFrameActual() << ", Activa: " << pescador.isAnimacionActiva() << std::endl;
-            }
-            
+                        
             // Mostrar mecánica de juego y activar sistemas cuando termina la animación
             if (animacionTerminada) {
                 // Inicializar sistemas la primera vez que se detecta el fin de animación
@@ -280,13 +337,11 @@ if (estado == INICIO) {
                     
                     // Inicializar cuadrado verde (movimiento directo)
                     cuadradoX = posMecanica.x + (((208 + 310) / 2.0f) + 1); // Centro entre 208 y 310
-                    cuadradoLimiteSup = posMecanica.y + 125;  // Límite superior
-                    cuadradoLimiteInf = posMecanica.y + boundsMecanica.height - 125;  // Límite inferior
+                    cuadradoLimiteSup = posMecanica.y + 90;  // Límite superior
+                    cuadradoLimiteInf = posMecanica.y + boundsMecanica.height - 90;  // Límite inferior
                     cuadradoY = cuadradoLimiteSup + 150; // Comenzar BIEN ABAJO del límite superior para caer visiblemente
                     cuadradoVelocidadY = 0; // Empezar sin velocidad inicial
                     
-                    std::cout << "Cuadrado inicializado en: (" << cuadradoX << ", " << cuadradoY << ")" << std::endl;
-                    std::cout << "Límites Y: " << cuadradoLimiteSup << " - " << cuadradoLimiteInf << std::endl;
                     
                     cuadradoInicializado = true;
                     mostrarPezFisico = true;
@@ -296,7 +351,6 @@ if (estado == INICIO) {
                     tiempoRetoRestante = tiempoRetoTotal;
                     tiempoContactoAcumulado = 0.0f;
                     relojReto.restart();
-                    std::cout << "Sistemas inicializados: Pez simple + Cuadrado verde movimiento directo" << std::endl;
                 }
                 
                 // Mostrar mecánica de juego
@@ -312,20 +366,21 @@ if (estado == INICIO) {
                     float pezZonaMedia = (pezLimiteSup + pezLimiteInf) * 0.5f; // Punto medio
                     float pezZonaMediaMargen = 12.0f; // Margen para detectar paso por la zona media
                     
-                    // Cambiar velocidad gradualmente para movimiento impredecible
-                    if (!retoGanado) {
-                        pezVelocidadY += (rand() % 10 - 5) * pezVelocidadCambio;
+                    // Cambiar velocidad gradualmente para movimiento impredecible (escalado por dt)
+                    if (retoActivo) {
+                        pezVelocidadY += ((rand() % 10 - 5) * pezVelocidadCambio) * dt;
                         if (pezVelocidadY > pezVelocidadMax) pezVelocidadY = pezVelocidadMax;
                         if (pezVelocidadY < pezVelocidadMin) pezVelocidadY = pezVelocidadMin;
                     }
                     
                     // Mover pez arriba y abajo
-                    if (!retoGanado) {
-                        pezPosY += pezVelocidadY * pezDireccion;
+                    if (retoActivo) {
+                        // Movimiento del pez escalado por dt para independencia del framerate
+                        pezPosY += (pezVelocidadY * pezDireccion) * dt;
                     }
 
                     // Al cruzar por la zona media, existe probabilidad de cambiar velocidad y/o dirección
-                    if (!retoGanado && std::abs(pezPosY - pezZonaMedia) <= pezZonaMediaMargen) {
+                    if (retoActivo && std::abs(pezPosY - pezZonaMedia) <= pezZonaMediaMargen) {
                         // Probabilidad de cambiar velocidad (30%)
                         if ((rand() % 100) < 5) {
                             float r = static_cast<float>(rand() % 100) / 100.0f; // 0..1
@@ -351,7 +406,7 @@ if (estado == INICIO) {
                     
                     // === FÍSICA DE GRAVEDAD DEL CUADRADO VERDE ===
                     // Aplicar gravedad constantemente
-                    if (!retoGanado) {
+                    if (retoActivo) {
                         cuadradoVelocidadY += cuadradoGravedad * dt; // dt es delta time
                     }
                     
@@ -361,7 +416,7 @@ if (estado == INICIO) {
                     }
                     
                     // Actualizar posición Y con la velocidad
-                    if (!retoGanado) {
+                    if (retoActivo) {
                         cuadradoY += cuadradoVelocidadY * dt;
                     }
                     
@@ -381,9 +436,6 @@ if (estado == INICIO) {
                     window.draw(cuadradoVerdeShape);
                     window.draw(spritePezMec);
                     
-                    // Debug
-                    std::cout << "Pez: (" << pezPosX << ", " << pezPosY << ") Vel: " << pezVelocidadY * pezDireccion;
-                    std::cout << " | Cuadrado: (" << cuadradoX << ", " << cuadradoY << ") VelY: " << cuadradoVelocidadY << std::endl;
 
                     // === DETECCIÓN DE CONTACTO Y LÓGICA DE RETO ===
                     if (retoActivo && !retoGanado) {
@@ -400,17 +452,35 @@ if (estado == INICIO) {
                             tiempoContactoAcumulado += dt;
                         }
 
-                        // Comprobar victoria
+                        // Comprobar victoria/derrota y preparar mensaje
                         if (tiempoContactoAcumulado >= tiempoContactoNecesario) {
                             retoGanado = true;
                             retoActivo = false;
-                            std::cout << "\n=== RETO SUPERADO ===\n";
-                            std::cout << "Contacto acumulado: " << tiempoContactoAcumulado << "s de " << tiempoContactoNecesario << "s" << std::endl;
+                            // Ir a pantalla de victoria primero
+                            estado = VICTORIA;
+                            // Preparar recompensa para después
+                            recompensaManager.loadDefaults();
+                            const Reward& r = recompensaManager.pickRandom();
+                            recompensaSeleccionada = &r;
+                            // Intentar carga directa por ruta para evitar problemas de sprite interno
+                            if (!r.imagePath.empty()) {
+                                if (recompensaTexture.loadFromFile(r.imagePath)) {
+                                    recompensaSprite.setTexture(recompensaTexture);
+                                }
+                            }
+                            // Configurar texto de nombre
+                            textoRecompensaNombre.setFont(texto.getFont());
+                            textoRecompensaNombre.setCharacterSize(48);
+                            textoRecompensaNombre.setFillColor(Color::White);
+                            textoRecompensaNombre.setString(r.displayName);
+                            // Centrar el nombre bajo el sprite
+                            FloatRect nameBounds = textoRecompensaNombre.getLocalBounds();
+                            textoRecompensaNombre.setOrigin(nameBounds.left + nameBounds.width/2.f, nameBounds.top + nameBounds.height/2.f);
                         } else if (tiempoRetoRestante <= 0) {
-                            // Fin del reto sin victoria
                             retoActivo = false;
-                            std::cout << "\n=== RETO FALLIDO ===\n";
-                            std::cout << "Contacto acumulado: " << tiempoContactoAcumulado << "s de " << tiempoContactoNecesario << "s" << std::endl;
+                            retoGanado = false;
+                            // Ir a pantalla de derrota
+                            estado = DERROTA;
                         }
 
                         // Actualizar HUD en pantalla (esquina sup. derecha y medio lado derecho)
@@ -430,18 +500,110 @@ if (estado == INICIO) {
                             hudContactoTiempo.setFillColor(Color::White);
                         }
                         
-                        // Mostrar estado simple en consola
-                        std::cout << "Reto: restante=" << tiempoRetoRestante << "s, contacto=" << tiempoContactoAcumulado << "s" << (enContacto ? " [CONTACTO]" : "") << std::endl;
                     }
 
-                    // Dibujar HUD cuando el reto está activo o ganado/terminado
+                    // Dibujar HUD cuando el reto está activo o ha terminado
                     if (mostrarPezFisico) {
                         window.draw(hudRetoTiempo);
                         window.draw(hudContactoTiempo);
+                        if (!retoActivo && mensajeReto.getString().getSize() > 0) {
+                            // Centrar el mensaje en pantalla
+                            FloatRect bounds = mensajeReto.getLocalBounds();
+                            float x = (anchoVentana - bounds.width) * 0.5f - bounds.left;
+                            float y = (altoVentana - bounds.height) * 0.5f - bounds.top;
+                            mensajeReto.setPosition(x, y);
+                            window.draw(mensajeReto);
+                        }
                     }
                 }
             }
             window.draw(spriteSombra);
+        } else if (estado == RECOMPENSAS) {
+            // Pantalla de recompensas solo con fondo negro
+            window.clear(Color::Black);
+            if (recompensaSeleccionada) {
+                // Preferir sprite cargado directamente si está disponible
+                Sprite sp = (!recompensaTexture.getSize().x ? recompensaSeleccionada->sprite : recompensaSprite);
+                Vector2u texSize = (!recompensaTexture.getSize().x ? recompensaSeleccionada->texture.getSize() : recompensaTexture.getSize());
+                // Caja objetivo dentro de la tarjeta de recompensa
+                float maxW = 450.0f;
+                float maxH = 400.0f;
+                float scaleX = (texSize.x > 0) ? (maxW / static_cast<float>(texSize.x)) : 1.f;
+                float scaleY = (texSize.y > 0) ? (maxH / static_cast<float>(texSize.y)) : 1.f;
+                float scale = std::min(scaleX, scaleY);
+                sp.setScale(scale, scale);
+                // Posicionar centrado
+                FloatRect sb = sp.getGlobalBounds();
+                float cx = (anchoVentana - sb.width) * 0.5f;
+                float cy = (altoVentana - sb.height) * 0.5f - 20;
+                sp.setPosition(cx, cy);
+                window.draw(sp);
+                // Posicionar nombre centrado bajo el sprite
+                textoRecompensaNombre.setPosition(anchoVentana/2.f, cy + sb.height + 50);
+                window.draw(textoRecompensaNombre);
+            }
+            // Tip: Presionar Enter para volver (con parpadeo)
+            if (mostrarTexto1Visible) {  // Usar la misma variable de parpadeo que el menú inicial
+                Text hint;
+                hint.setFont(texto.getFont());
+                hint.setCharacterSize(24);
+                hint.setFillColor(Color::White);
+                hint.setString("Presiona Enter para continuar");
+                FloatRect hb = hint.getLocalBounds();
+                hint.setOrigin(hb.left + hb.width/2.f, hb.top + hb.height/2.f);
+                hint.setPosition(anchoVentana/2.f, altoVentana - 70);
+                window.draw(hint);
+            }
+        } else if (estado == VICTORIA) {
+            // Pantalla negra con mensaje de victoria
+            window.clear(Color::Black);
+            // Mensaje principal de victoria
+            Text victoriaTexto;
+            victoriaTexto.setFont(texto.getFont());
+            victoriaTexto.setString("¡Has pescado!");
+            victoriaTexto.setCharacterSize(72);
+            victoriaTexto.setFillColor(Color(0, 255, 0)); // Verde
+            FloatRect vBounds = victoriaTexto.getLocalBounds();
+            victoriaTexto.setOrigin(vBounds.left + vBounds.width/2.f, vBounds.top + vBounds.height/2.f);
+            victoriaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f - 50);
+            window.draw(victoriaTexto);
+            // Mensaje de continuar (con parpadeo)
+            if (mostrarTexto1Visible) {
+                Text continuar;
+                continuar.setFont(texto.getFont());
+                continuar.setString("Presiona Enter para descubrir tu recompensa");
+                continuar.setCharacterSize(30);
+                continuar.setFillColor(Color::White);
+                FloatRect cBounds = continuar.getLocalBounds();
+                continuar.setOrigin(cBounds.left + cBounds.width/2.f, cBounds.top + cBounds.height/2.f);
+                continuar.setPosition(anchoVentana/2.f, altoVentana/2.f + 50);
+                window.draw(continuar);
+            }
+        } else if (estado == DERROTA) {
+            // Pantalla negra con mensaje de derrota
+            window.clear(Color::Black);
+            // Mensaje principal de derrota
+            Text derrotaTexto;
+            derrotaTexto.setFont(texto.getFont());
+            derrotaTexto.setString("Reto fallido\nIntenta de nuevo");
+            derrotaTexto.setCharacterSize(72);
+            derrotaTexto.setFillColor(Color(220, 60, 60)); // Rojo
+            FloatRect dBounds = derrotaTexto.getLocalBounds();
+            derrotaTexto.setOrigin(dBounds.left + dBounds.width/2.f, dBounds.top + dBounds.height/2.f);
+            derrotaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f - 50);
+            window.draw(derrotaTexto);
+            // Mensaje de continuar (con parpadeo)
+            if (mostrarTexto1Visible) {
+                Text continuar;
+                continuar.setFont(texto.getFont());
+                continuar.setString("Presiona Enter para volver a pescar");
+                continuar.setCharacterSize(30);
+                continuar.setFillColor(Color::White);
+                FloatRect cBounds = continuar.getLocalBounds();
+                continuar.setOrigin(cBounds.left + cBounds.width/2.f, cBounds.top + cBounds.height/2.f);
+                continuar.setPosition(anchoVentana/2.f, altoVentana/2.f + 50);
+                window.draw(continuar);
+            }
         }
 
              // Transición de fundido
@@ -472,4 +634,3 @@ if (estado == INICIO) {
         detenerMusicaJuego();
         return 0;
     }
-
