@@ -12,15 +12,16 @@ class Pescador {
         void mostrarpescando();
         int getFrameActual() const { return currentFrame; }
         bool isAnimacionActiva() const { return animacionActiva; }
+        bool isEnBucleFinal() const { return modoBucle && currentFrame >= numFrames - 3; }
+        int currentFrame;
 
     private:
         Sprite sprite;
-        int currentFrame;
-        int numFrames = 11;
         Clock clock;
         float frameTime;
         bool animacionActiva;
         bool modoBucle = true;
+        static const int numFrames = 11;
         IntRect framesRects[11] = {
             IntRect(0, 0, 155, 500),      // Frame 0
             IntRect(155, 0, 155, 500),    // Frame 1
