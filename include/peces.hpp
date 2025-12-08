@@ -19,6 +19,12 @@ struct Reward {
 	string id;          // identificador interno
 	string displayName; // nombre para mostrar
 	float rarity;            // 0.0 (común) a 1.0 (muy raro)
+	int basePoints;          // puntos base sin multiplicador
+	float minWeight;         // peso mínimo del rango (kg)
+	float maxWeight;         // peso máximo del rango (kg)
+	float actualWeight;      // peso actual generado dentro del rango
+	float multiplier;        // multiplicador calculado basado en peso
+	int finalPoints;         // puntos finales con multiplicador aplicado
 	string imagePath;    // ruta del asset para cargas directas
 	Texture texture;     // recurso gráfico
 	Sprite  sprite;      // sprite listo para dibujar
@@ -30,8 +36,17 @@ public:
 	// Cargar lista de recompensas disponibles
 	void loadDefaults();
 
-	// Seleccionar una recompensa aleatoria ponderada por "rarity"
+	// Selección una recompensa aleatoria ponderada por "rarity"
 	const Reward& pickRandom();
+
+	// Generar peso aleatorio dentro del rango específico del pez
+	float generateWeightInRange(float minWeight, float maxWeight);
+
+	// Calcular multiplicador basado en peso relativo
+	float calculateMultiplier(float actualWeight, float minWeight, float maxWeight);
+
+	// Calcular puntos finales con multiplicador
+	int calculateFinalPoints(int basePoints, float multiplier);
 
 	// Acceso a todas
 	const vector<Reward>& all() const { return rewards; }

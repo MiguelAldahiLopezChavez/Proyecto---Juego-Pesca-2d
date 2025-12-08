@@ -37,9 +37,12 @@ int main()
      
      // Variables de control
      Clock timerAnimacion;
+     Clock timerInstrucciones;
      bool animacionTerminada = false;
      bool mostrarPezFisico = false;
+     bool mostrarInstrucciones = false;
      float tiempoEspera = 2.0f; // 2 segundos después de terminar animación
+     float tiempoInstrucciones = 10.0f; // 10 segundos para mostrar instrucciones
      
 
 
@@ -123,16 +126,29 @@ int main()
     float tiempoContactoAcumulado = 0.0f;
     float tiempoContactoNecesario = 5.0f;
     Clock relojReto;
-
+    
+    // Timers para mensajes automáticos
+    Clock timerVictoria;
+    Clock timerDerrota;
+    float tiempoMostrarMensaje = 3.0f; // 3 segundos para mostrar mensajes
+    
+    // Sistema de juego: 10 intentos, 3 fallos máx, 1000 pts meta
+    int intentosRealizados = 0;
+    int intentosMaximos = 5;
+    int fallosAcumulados = 0;
+    int fallosMaximos = 3;
+    int puntosAcumulados = 0;
+    int puntosMeta = 1000;
+    bool juegoTerminado = false;
 
     controlTexto texto;
     texto.loadFont("assets/Letras/opcion 1/Bear Days.ttf");
 
     Text mostrarTexto;
     Text mostrarTexto1;
+    Text textoInstrucciones;
     Text hudRetoTiempo;       
     Text hudContactoTiempo;   
-    Text infoJuego;
     Text mensajeReto;         // Mensaje grande de resultado (ganado/fallido)
     // Recompensas
     RewardManager recompensaManager;
@@ -141,6 +157,11 @@ int main()
     Texture recompensaTexture;
     Sprite recompensaSprite;
     Text textoRecompensaNombre;
+    Text textoRecompensaPeso;
+    Text textoRecompensaPuntos;
+    Text textoRecompensaMultiplicador;
+    Text hudIntentos;        // HUD arriba del pescador "X/10"
+    Text hudPuntosTotales;   // HUD esquina sup. derecha "X/1000"
 
     Clock reloj;
     bool mostrarTexto1Visible = true;
@@ -169,17 +190,29 @@ int main()
     hudContactoTiempo.setCharacterSize(50);
     hudContactoTiempo.setFillColor(Color::White);
     hudContactoTiempo.setPosition(anchoVentana - 400, altoVentana / 2 - 14);
-    
-    infoJuego.setFont(texto.getFont());
-    infoJuego.setString("\t\t\t\t\tUsa SPACE para pescar\nUsa UP o clic izquierdo para mover rectangulo verde");
-    infoJuego.setCharacterSize(20);
-    infoJuego.setFillColor(Color::White);
-    infoJuego.setPosition((anchoVentana/2) - 275, 50);
 
     mensajeReto.setFont(texto.getFont());
     mensajeReto.setCharacterSize(72);
     mensajeReto.setFillColor(Color::White);
     mensajeReto.setString("");
+
+    textoInstrucciones.setFont(texto.getFont());
+    textoInstrucciones.setString("Instrucciones:\n\nControles: SPACE para lanzar\nUP/clic para controlar la barra.\n\nMeta: 1000 pts en 5 lanzamientos.\nSolo 3 fallos permitidos.\n\n\t\t\t\tBuena suerte!");
+    textoInstrucciones.setCharacterSize(30);
+    textoInstrucciones.setFillColor(Color::White);
+    textoInstrucciones.setPosition((anchoVentana/2) - 300, 200);
+    
+    // Configurar HUD de intentos (arriba del pescador)
+    hudIntentos.setFont(texto.getFont());
+    hudIntentos.setCharacterSize(36);
+    hudIntentos.setFillColor(Color::White);
+    hudIntentos.setPosition(anchoVentana/2 - 40, 50);
+    
+    // Configurar HUD de puntos totales (esquina superior derecha)
+    hudPuntosTotales.setFont(texto.getFont());
+    hudPuntosTotales.setCharacterSize(40);
+    hudPuntosTotales.setFillColor(Color(255, 215, 0)); // Dorado
+    hudPuntosTotales.setPosition(anchoVentana - 200, 30);
 
     RenderWindow window(VideoMode(anchoVentana, altoVentana), "Juego de Pesca 2D");
     iniciarMusicaJuego("assets/Musica/Troubadeck 25 Deep Dark Sea.ogg");
@@ -187,7 +220,7 @@ int main()
     Sprite spriteFondo(fondo);
     Sprite spriteFondo2(fondo2);
 
-    enum EstadoPantalla { INICIO, TRANSICION, JUEGO, VICTORIA, DERROTA, RECOMPENSAS };
+    enum EstadoPantalla { INICIO, TRANSICION, INSTRUCCIONES, TRANSICION_FINAL, JUEGO, VICTORIA, DERROTA, RECOMPENSAS, REINICIO_TRANSICION };
     EstadoPantalla estado = INICIO;
 
     int opacidad = 0;
@@ -208,7 +241,7 @@ int main()
                 window.close();
             if (estado == INICIO && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
                 estado = TRANSICION;
-                opacidad = 0; // Inicializa opacidad solo al entrar en transición
+                opacidad = 0;
             }
             // Reiniciar reto con Enter cuando el reto terminó (ganado o perdido) y estamos en JUEGO
             if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
@@ -222,46 +255,42 @@ int main()
             }
             // Salir de pantalla de recompensas con Enter
             if (estado == RECOMPENSAS && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
-                // Iniciar transición de vuelta al juego
-                estado = TRANSICION;
-                opacidad = 0; // Reiniciar transición
                 recompensaSeleccionada = nullptr;
                 mensajeReto.setString("");
-                // Resetear animación del pescador para volver al inicio
-                animacionTerminada = false;
-                mostrarPezFisico = false;
-                bucleFinalIniciado = false;
-                animacionBucleIniciada = false;
-                pescador.currentFrame = 3;
-                // Limpiar variables del reto
-                retoActivo = false;
-                retoGanado = false;
-                tiempoRetoRestante = 0.0f;
-                tiempoContactoAcumulado = 0.0f;
-                cuadradoInicializado = false;
+                
+                // Verificar condiciones de fin de juego
+                if (puntosAcumulados >= puntosMeta) {
+                    // ¡Victoria! Alcanzó la meta de puntos - ir directo a pantalla final
+                    juegoTerminado = true;
+                    estado = VICTORIA;
+                } else if (intentosRealizados >= intentosMaximos) {
+                    // Se acabaron los intentos sin alcanzar la meta - ir directo a pantalla final
+                    juegoTerminado = true;
+                    estado = DERROTA;
+                } else {
+                    // Continuar jugando
+                    estado = JUEGO;
+                    // Resetear animación del pescador para volver al inicio
+                    animacionTerminada = false;
+                    mostrarPezFisico = false;
+                    bucleFinalIniciado = false;
+                    animacionBucleIniciada = false;
+                    pescador.currentFrame = 3;
+                    // Limpiar variables del reto
+                    retoActivo = false;
+                    retoGanado = false;
+                    tiempoRetoRestante = 0.0f;
+                    tiempoContactoAcumulado = 0.0f;
+                    cuadradoInicializado = false;
+                }
+                // Importante: evitar que este mismo evento Enter dispare el reinicio inmediato
+                // en las pantallas finales (VICTORIA/DERROTA). Pasar al siguiente evento.
+                continue;
             }
-            // Continuar desde VICTORIA a RECOMPENSAS
-            if (estado == VICTORIA && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
-                estado = RECOMPENSAS;
-            }
-            // Continuar desde DERROTA de vuelta al juego
-            if (estado == DERROTA && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
-                // Resetear al estado inicial del juego
-                estado = TRANSICION;
+            // Iniciar transición antes de reiniciar desde pantallas finales de VICTORIA/DERROTA
+            if ((estado == VICTORIA || estado == DERROTA) && juegoTerminado && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
                 opacidad = 0;
-                // Resetear animación del pescador para volver al inicio
-                animacionTerminada = false;
-                mostrarPezFisico = false;
-                bucleFinalIniciado = false;
-                animacionBucleIniciada = false;
-                pescador.currentFrame = 3;
-                // Limpiar variables del reto
-                retoActivo = false;
-                retoGanado = false;
-                tiempoRetoRestante = 0.0f;
-                tiempoContactoAcumulado = 0.0f;
-                cuadradoInicializado = false;
-                mensajeReto.setString("");
+                estado = REINICIO_TRANSICION;
             }
             // Control de animación del pescador (solo SPACE)
             if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Space) {
@@ -295,6 +324,7 @@ int main()
 
 
 if (estado == INICIO) {
+            // Pantalla normal de inicio
             window.draw(mostrarTexto);
             if (mostrarTexto1Visible) {
                 window.draw(mostrarTexto1);
@@ -309,10 +339,6 @@ if (estado == INICIO) {
             }
             pescador.update();
             window.draw(pescador.obtenerSprite());
-            // Mostrar infoJuego mientras aún no termina la animación del pescador
-            if (!animacionTerminada) {
-                window.draw(infoJuego);
-            }
             
             // Las físicas simples del pez se manejan directamente cuando aparece
             
@@ -456,12 +482,24 @@ if (estado == INICIO) {
                         if (tiempoContactoAcumulado >= tiempoContactoNecesario) {
                             retoGanado = true;
                             retoActivo = false;
-                            // Ir a pantalla de victoria primero
-                            estado = VICTORIA;
-                            // Preparar recompensa para después
+                            
+                            // Contar intento exitoso y agregar puntos
+                            intentosRealizados++;
+                            
+                            // Preparar recompensa y calcular puntos
                             recompensaManager.loadDefaults();
                             const Reward& r = recompensaManager.pickRandom();
                             recompensaSeleccionada = &r;
+                            
+                            // Agregar puntos del pez capturado
+                            puntosAcumulados += r.finalPoints;
+                            
+                            // Asegurar que esta es victoria individual (no final)
+                            // juegoTerminado se verifica después en recompensas
+                            
+                            // Ir a pantalla de victoria primero (individual, no final)
+                            estado = VICTORIA;
+                            timerVictoria.restart();
                             // Intentar carga directa por ruta para evitar problemas de sprite interno
                             if (!r.imagePath.empty()) {
                                 if (recompensaTexture.loadFromFile(r.imagePath)) {
@@ -473,14 +511,58 @@ if (estado == INICIO) {
                             textoRecompensaNombre.setCharacterSize(48);
                             textoRecompensaNombre.setFillColor(Color::White);
                             textoRecompensaNombre.setString(r.displayName);
-                            // Centrar el nombre bajo el sprite
+                            // Centrar el nombre
                             FloatRect nameBounds = textoRecompensaNombre.getLocalBounds();
                             textoRecompensaNombre.setOrigin(nameBounds.left + nameBounds.width/2.f, nameBounds.top + nameBounds.height/2.f);
+                            
+                            // Configurar texto de peso
+                            textoRecompensaPeso.setFont(texto.getFont());
+                            textoRecompensaPeso.setCharacterSize(32);
+                            textoRecompensaPeso.setFillColor(Color(200, 200, 255)); // Azul claro
+                            char pesoBuffer[128];
+                            std::snprintf(pesoBuffer, sizeof(pesoBuffer), "Peso: %.1f kg (Rango: %.0f-%.0f kg)", 
+                                         r.actualWeight, r.minWeight, r.maxWeight);
+                            textoRecompensaPeso.setString(pesoBuffer);
+                            FloatRect pesoBounds = textoRecompensaPeso.getLocalBounds();
+                            textoRecompensaPeso.setOrigin(pesoBounds.left + pesoBounds.width/2.f, pesoBounds.top + pesoBounds.height/2.f);
+                            
+                            // Configurar texto del multiplicador
+                            textoRecompensaMultiplicador.setFont(texto.getFont());
+                            textoRecompensaMultiplicador.setCharacterSize(36);
+                            textoRecompensaMultiplicador.setFillColor(Color(255, 150, 50)); // Naranja
+                            char multBuffer[128];
+                            std::snprintf(multBuffer, sizeof(multBuffer), "¡%s de %.1fkg! ×%.2f = %dpts", 
+                                         r.displayName.c_str(), r.actualWeight, r.multiplier, r.finalPoints);
+                            textoRecompensaMultiplicador.setString(multBuffer);
+                            FloatRect multBounds = textoRecompensaMultiplicador.getLocalBounds();
+                            textoRecompensaMultiplicador.setOrigin(multBounds.left + multBounds.width/2.f, multBounds.top + multBounds.height/2.f);
+                            
+                            // Configurar texto de puntos base
+                            textoRecompensaPuntos.setFont(texto.getFont());
+                            textoRecompensaPuntos.setCharacterSize(28);
+                            textoRecompensaPuntos.setFillColor(Color(180, 180, 180)); // Gris claro
+                            char puntosBuffer[64];
+                            std::snprintf(puntosBuffer, sizeof(puntosBuffer), "(Base: %d pts)", r.basePoints);
+                            textoRecompensaPuntos.setString(puntosBuffer);
+                            FloatRect puntosBounds = textoRecompensaPuntos.getLocalBounds();
+                            textoRecompensaPuntos.setOrigin(puntosBounds.left + puntosBounds.width/2.f, puntosBounds.top + puntosBounds.height/2.f);
                         } else if (tiempoRetoRestante <= 0) {
                             retoActivo = false;
                             retoGanado = false;
-                            // Ir a pantalla de derrota
-                            estado = DERROTA;
+                            
+                            // Contar fallo e intento
+                            fallosAcumulados++;
+                            intentosRealizados++;
+                            
+                            // Verificar si se acabaron los fallos permitidos
+                            if (fallosAcumulados >= fallosMaximos) {
+                                juegoTerminado = true;
+                                estado = DERROTA;
+                            } else {
+                                // Continuar jugando, mostrar mensaje de fallo temporal
+                                estado = DERROTA;
+                                timerDerrota.restart();
+                            }
                         }
 
                         // Actualizar HUD en pantalla (esquina sup. derecha y medio lado derecho)
@@ -517,6 +599,19 @@ if (estado == INICIO) {
                     }
                 }
             }
+            
+            // Mostrar HUD de intentos y puntos siempre en el juego
+            char intentosBuffer[32];
+            std::snprintf(intentosBuffer, sizeof(intentosBuffer), "%d/%d", intentosRealizados, intentosMaximos);
+            hudIntentos.setString(intentosBuffer);
+            
+            char puntosBuffer[32];
+            std::snprintf(puntosBuffer, sizeof(puntosBuffer), "%d/%d", puntosAcumulados, puntosMeta);
+            hudPuntosTotales.setString(puntosBuffer);
+            
+            window.draw(hudIntentos);
+            window.draw(hudPuntosTotales);
+            
             window.draw(spriteSombra);
         } else if (estado == RECOMPENSAS) {
             // Pantalla de recompensas solo con fondo negro
@@ -535,12 +630,19 @@ if (estado == INICIO) {
                 // Posicionar centrado
                 FloatRect sb = sp.getGlobalBounds();
                 float cx = (anchoVentana - sb.width) * 0.5f;
-                float cy = (altoVentana - sb.height) * 0.5f - 20;
+                float cy = (altoVentana - sb.height) * 0.5f - 100;
                 sp.setPosition(cx, cy);
                 window.draw(sp);
-                // Posicionar nombre centrado bajo el sprite
-                textoRecompensaNombre.setPosition(anchoVentana/2.f, cy + sb.height + 50);
+                // Posicionar textos centrados bajo el sprite
+                textoRecompensaNombre.setPosition(anchoVentana/2.f, cy + sb.height + 20);
+                textoRecompensaMultiplicador.setPosition(anchoVentana/2.f, cy + sb.height + 170);
+                textoRecompensaPeso.setPosition(anchoVentana/2.f, cy + sb.height + 80);
+                textoRecompensaPuntos.setPosition(anchoVentana/2.f, cy + sb.height + 120);
+                
                 window.draw(textoRecompensaNombre);
+                window.draw(textoRecompensaMultiplicador);
+                window.draw(textoRecompensaPeso);
+                window.draw(textoRecompensaPuntos);
             }
             // Tip: Presionar Enter para volver (con parpadeo)
             if (mostrarTexto1Visible) {  // Usar la misma variable de parpadeo que el menú inicial
@@ -551,76 +653,229 @@ if (estado == INICIO) {
                 hint.setString("Presiona Enter para continuar");
                 FloatRect hb = hint.getLocalBounds();
                 hint.setOrigin(hb.left + hb.width/2.f, hb.top + hb.height/2.f);
-                hint.setPosition(anchoVentana/2.f, altoVentana - 70);
+                hint.setPosition(anchoVentana/2.f, altoVentana - 675);
                 window.draw(hint);
             }
         } else if (estado == VICTORIA) {
             // Pantalla negra con mensaje de victoria
             window.clear(Color::Black);
-            // Mensaje principal de victoria
-            Text victoriaTexto;
-            victoriaTexto.setFont(texto.getFont());
-            victoriaTexto.setString("¡Has pescado!");
-            victoriaTexto.setCharacterSize(72);
-            victoriaTexto.setFillColor(Color(0, 255, 0)); // Verde
-            FloatRect vBounds = victoriaTexto.getLocalBounds();
-            victoriaTexto.setOrigin(vBounds.left + vBounds.width/2.f, vBounds.top + vBounds.height/2.f);
-            victoriaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f - 50);
-            window.draw(victoriaTexto);
-            // Mensaje de continuar (con parpadeo)
-            if (mostrarTexto1Visible) {
-                Text continuar;
-                continuar.setFont(texto.getFont());
-                continuar.setString("Presiona Enter para descubrir tu recompensa");
-                continuar.setCharacterSize(30);
-                continuar.setFillColor(Color::White);
-                FloatRect cBounds = continuar.getLocalBounds();
-                continuar.setOrigin(cBounds.left + cBounds.width/2.f, cBounds.top + cBounds.height/2.f);
-                continuar.setPosition(anchoVentana/2.f, altoVentana/2.f + 50);
-                window.draw(continuar);
+            
+            if (juegoTerminado) {
+                // Victoria final del juego
+                Text victoriaTexto;
+                victoriaTexto.setFont(texto.getFont());
+                victoriaTexto.setString("¡FELICIDADES!\n¡Alcanzaste la meta!");
+                victoriaTexto.setCharacterSize(60);
+                victoriaTexto.setFillColor(Color(0, 255, 0)); // Verde
+                FloatRect vBounds = victoriaTexto.getLocalBounds();
+                victoriaTexto.setOrigin(vBounds.left + vBounds.width/2.f, vBounds.top + vBounds.height/2.f);
+                victoriaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f - 50);
+                window.draw(victoriaTexto);
+                
+                // Mostrar estadísticas
+                Text statsTexto;
+                statsTexto.setFont(texto.getFont());
+                char statsBuffer[256];
+                std::snprintf(statsBuffer, sizeof(statsBuffer), 
+                             "Puntos obtenidos: %d/%d\nIntentos usados: %d/%d\nFallos: %d/%d", 
+                             puntosAcumulados, puntosMeta, intentosRealizados, intentosMaximos, fallosAcumulados, fallosMaximos);
+                statsTexto.setString(statsBuffer);
+                statsTexto.setCharacterSize(36);
+                statsTexto.setFillColor(Color::White);
+                FloatRect sBounds = statsTexto.getLocalBounds();
+                statsTexto.setOrigin(sBounds.left + sBounds.width/2.f, sBounds.top + sBounds.height/2.f);
+                statsTexto.setPosition(anchoVentana/2.f, altoVentana/2.f + 80);
+                window.draw(statsTexto);
+                
+                // Mensaje de reinicio (con parpadeo)
+                if (mostrarTexto1Visible) {
+                    Text reiniciarTexto;
+                    reiniciarTexto.setFont(texto.getFont());
+                    reiniciarTexto.setString("Presiona Enter para reiniciar");
+                    reiniciarTexto.setCharacterSize(28);
+                    reiniciarTexto.setFillColor(Color::White);
+                    FloatRect rBounds = reiniciarTexto.getLocalBounds();
+                    reiniciarTexto.setOrigin(rBounds.left + rBounds.width/2.f, rBounds.top + rBounds.height/2.f);
+                    reiniciarTexto.setPosition(anchoVentana/2.f, altoVentana - 100);
+                    window.draw(reiniciarTexto);
+                }
+            } else {
+                // Victoria de un solo pez (juegoTerminado = false)
+                Text victoriaTexto;
+                victoriaTexto.setFont(texto.getFont());
+                victoriaTexto.setString("¡Has pescado!");
+                victoriaTexto.setCharacterSize(72);
+                victoriaTexto.setFillColor(Color(0, 255, 0)); // Verde
+                FloatRect vBounds = victoriaTexto.getLocalBounds();
+                victoriaTexto.setOrigin(vBounds.left + vBounds.width/2.f, vBounds.top + vBounds.height/2.f);
+                victoriaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f);
+                window.draw(victoriaTexto);
+                
+                // Transición automática después de 3 segundos solo para victorias individuales
+                if (!juegoTerminado && timerVictoria.getElapsedTime().asSeconds() >= tiempoMostrarMensaje) {
+                    estado = RECOMPENSAS;
+                }
             }
         } else if (estado == DERROTA) {
             // Pantalla negra con mensaje de derrota
             window.clear(Color::Black);
-            // Mensaje principal de derrota
-            Text derrotaTexto;
-            derrotaTexto.setFont(texto.getFont());
-            derrotaTexto.setString("Reto fallido\nIntenta de nuevo");
-            derrotaTexto.setCharacterSize(72);
-            derrotaTexto.setFillColor(Color(220, 60, 60)); // Rojo
-            FloatRect dBounds = derrotaTexto.getLocalBounds();
-            derrotaTexto.setOrigin(dBounds.left + dBounds.width/2.f, dBounds.top + dBounds.height/2.f);
-            derrotaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f - 50);
-            window.draw(derrotaTexto);
-            // Mensaje de continuar (con parpadeo)
-            if (mostrarTexto1Visible) {
-                Text continuar;
-                continuar.setFont(texto.getFont());
-                continuar.setString("Presiona Enter para volver a pescar");
-                continuar.setCharacterSize(30);
-                continuar.setFillColor(Color::White);
-                FloatRect cBounds = continuar.getLocalBounds();
-                continuar.setOrigin(cBounds.left + cBounds.width/2.f, cBounds.top + cBounds.height/2.f);
-                continuar.setPosition(anchoVentana/2.f, altoVentana/2.f + 50);
-                window.draw(continuar);
+            
+            if (juegoTerminado) {
+                // Derrota final del juego
+                Text derrotaTexto;
+                derrotaTexto.setFont(texto.getFont());
+                if (fallosAcumulados >= fallosMaximos) {
+                    derrotaTexto.setString("¡JUEGO TERMINADO!\nDemasiados fallos");
+                } else {
+                    derrotaTexto.setString("¡JUEGO TERMINADO!\nNo alcanzaste la meta");
+                }
+                derrotaTexto.setCharacterSize(50);
+                derrotaTexto.setFillColor(Color(220, 60, 60)); // Rojo
+                FloatRect dBounds = derrotaTexto.getLocalBounds();
+                derrotaTexto.setOrigin(dBounds.left + dBounds.width/2.f, dBounds.top + dBounds.height/2.f);
+                derrotaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f - 50);
+                window.draw(derrotaTexto);
+                
+                // Mostrar estadísticas finales
+                Text statsTexto;
+                statsTexto.setFont(texto.getFont());
+                char statsBuffer[256];
+                std::snprintf(statsBuffer, sizeof(statsBuffer), 
+                             "Puntos obtenidos: %d/%d\nIntentos usados: %d/%d\nFallos: %d/%d", 
+                             puntosAcumulados, puntosMeta, intentosRealizados, intentosMaximos, fallosAcumulados, fallosMaximos);
+                statsTexto.setString(statsBuffer);
+                statsTexto.setCharacterSize(32);
+                statsTexto.setFillColor(Color::White);
+                FloatRect sBounds = statsTexto.getLocalBounds();
+                statsTexto.setOrigin(sBounds.left + sBounds.width/2.f, sBounds.top + sBounds.height/2.f);
+                statsTexto.setPosition(anchoVentana/2.f, altoVentana/2.f + 60);
+                window.draw(statsTexto);
+                
+                // Mensaje de reinicio (con parpadeo)
+                if (mostrarTexto1Visible) {
+                    Text reiniciarTexto;
+                    reiniciarTexto.setFont(texto.getFont());
+                    reiniciarTexto.setString("Presiona Enter para reiniciar");
+                    reiniciarTexto.setCharacterSize(28);
+                    reiniciarTexto.setFillColor(Color::White);
+                    FloatRect rBounds = reiniciarTexto.getLocalBounds();
+                    reiniciarTexto.setOrigin(rBounds.left + rBounds.width/2.f, rBounds.top + rBounds.height/2.f);
+                    reiniciarTexto.setPosition(anchoVentana/2.f, altoVentana - 100);
+                    window.draw(reiniciarTexto);
+                }
+            } else {
+                // Fallo individual (juegoTerminado = false)
+                Text derrotaTexto;
+                derrotaTexto.setFont(texto.getFont());
+                char falloBuffer[128];
+                std::snprintf(falloBuffer, sizeof(falloBuffer), "No pescaste nada\nFallos: %d/%d", fallosAcumulados, fallosMaximos);
+                derrotaTexto.setString(falloBuffer);
+                derrotaTexto.setCharacterSize(60);
+                derrotaTexto.setFillColor(Color(220, 60, 60)); // Rojo
+                FloatRect dBounds = derrotaTexto.getLocalBounds();
+                derrotaTexto.setOrigin(dBounds.left + dBounds.width/2.f, dBounds.top + dBounds.height/2.f);
+                derrotaTexto.setPosition(anchoVentana/2.f, altoVentana/2.f);
+                window.draw(derrotaTexto);
+                
+                // Transición automática después de 3 segundos solo para derrotas individuales
+                if (!juegoTerminado && timerDerrota.getElapsedTime().asSeconds() >= tiempoMostrarMensaje) {
+                    // Volver directamente al juego (pescador esperando)
+                    estado = JUEGO;
+                    // Resetear animación del pescador para volver al inicio
+                    animacionTerminada = false;
+                    mostrarPezFisico = false;
+                    bucleFinalIniciado = false;
+                    animacionBucleIniciada = false;
+                    pescador.currentFrame = 3;
+                    // Limpiar variables del reto
+                    retoActivo = false;
+                    retoGanado = false;
+                    tiempoRetoRestante = 0.0f;
+                    tiempoContactoAcumulado = 0.0f;
+                    cuadradoInicializado = false;
+                    mensajeReto.setString("");
+                }
             }
         }
 
-             // Transición de fundido
+        // Primera transición de fundido (INICIO -> INSTRUCCIONES)
         if (estado == TRANSICION) {
             if (opacidad < 255) {
-                opacidad += 1; // velocidad del fundido
+                opacidad += 1;
                 if (opacidad > 255) opacidad = 255;
                 fadeRect.setFillColor(Color(0, 0, 0, opacidad));
                 window.draw(fadeRect);
             } else {
-                // Cuando opacidad llega a 255, se mantiene el frame negro un ciclo
+                // Cuando termine la primera transición, ir a instrucciones
                 fadeRect.setFillColor(Color(0, 0, 0, 255));
                 window.draw(fadeRect);
                 window.display();
-                sf::sleep(sf::milliseconds(250)); // Pausa breve para el efecto
+                sf::sleep(sf::milliseconds(250));
+                estado = INSTRUCCIONES;
+                timerInstrucciones.restart();
+                continue;
+            }
+        }
+        
+        // Estado de instrucciones
+        else if (estado == INSTRUCCIONES) {
+            window.clear(Color::Black);
+            window.draw(textoInstrucciones);
+            
+            // Cuando termine el tiempo de instrucciones, ir a segunda transición
+            if (timerInstrucciones.getElapsedTime().asSeconds() >= tiempoInstrucciones) {
+                estado = TRANSICION_FINAL;
+                opacidad = 0;
+            }
+        }
+        
+        // Segunda transición de fundido (INSTRUCCIONES -> JUEGO)
+        else if (estado == TRANSICION_FINAL) {
+            if (opacidad < 255) {
+                opacidad += 1;
+                if (opacidad > 255) opacidad = 255;
+                fadeRect.setFillColor(Color(0, 0, 0, opacidad));
+                window.draw(fadeRect);
+            } else {
+                // Cuando termine la segunda transición, ir al juego
+                fadeRect.setFillColor(Color(0, 0, 0, 255));
+                window.draw(fadeRect);
+                window.display();
+                sf::sleep(sf::milliseconds(250));
                 estado = JUEGO;
                 animacionCortaMostrada = false;
+                fadeRect.setFillColor(Color(0, 0, 0, 0));
+                continue;
+            }
+        }
+        // Transición de reinicio desde pantallas finales hacia INICIO
+        else if (estado == REINICIO_TRANSICION) {
+            if (opacidad < 255) {
+                opacidad += 1; // transición lenta como la inicial
+                if (opacidad > 255) opacidad = 255;
+                fadeRect.setFillColor(Color(0, 0, 0, opacidad));
+                window.draw(fadeRect);
+            } else {
+                // Al concluir el fundido, efectuar el reinicio
+                // Resetear todas las variables del juego
+                intentosRealizados = 0;
+                fallosAcumulados = 0;
+                puntosAcumulados = 0;
+                juegoTerminado = false;
+                retoActivo = false;
+                retoGanado = false;
+                animacionTerminada = false;
+                mostrarPezFisico = false;
+                bucleFinalIniciado = false;
+                animacionBucleIniciada = false;
+                pescador.currentFrame = 3;
+                tiempoRetoRestante = 0.0f;
+                tiempoContactoAcumulado = 0.0f;
+                cuadradoInicializado = false;
+                mensajeReto.setString("");
+                recompensaSeleccionada = nullptr;
+                // Ir a inicio y limpiar fundido
+                estado = INICIO;
                 fadeRect.setFillColor(Color(0, 0, 0, 0));
                 continue;
             }
