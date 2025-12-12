@@ -1,7 +1,5 @@
 # 🎣 Juego de Pesca 2D
 
-![Juego](assets/imagen/GrabacionJuego.gif)
-
 ---
 
 ## 📝 Descripción del Proyecto
