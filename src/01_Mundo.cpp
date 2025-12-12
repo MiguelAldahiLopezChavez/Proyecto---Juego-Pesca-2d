@@ -42,12 +42,12 @@ int main()
      bool mostrarPezFisico = false;
      bool mostrarInstrucciones = false;
      float tiempoEspera = 2.0f; // 2 segundos después de terminar animación
-     float tiempoInstrucciones = 10.0f; // 10 segundos para mostrar instrucciones
+     float tiempoInstrucciones = 7.0f; // 8 segundos para mostrar instrucciones
      
 
 
     Texture fondo;
-       if (!fondo.loadFromFile("assets/Background.png")) 
+       if (!fondo.loadFromFile("assets/imagen/Background.png")) 
     {
 
         return -1;
@@ -117,11 +117,12 @@ int main()
     pescador.obtenerSprite().setPosition(anchoVentana/2-120, altoVentana/2-195);
     bool animacionBucleIniciada = false;
     bool bucleFinalIniciado = false;
+    bool sfxCatchPlayedForThisAnim = false; // reproducir sfx desde frame 6 una sola vez por animación
 
     // Sistema de reto: 15s para acumular 3s de contacto pez-rectángulo
     bool retoActivo = false;
     bool retoGanado = false;
-    float tiempoRetoTotal = 10.0f;
+    float tiempoRetoTotal = 8.0f;
     float tiempoRetoRestante = 0.0f;
     float tiempoContactoAcumulado = 0.0f;
     float tiempoContactoNecesario = 5.0f;
@@ -215,7 +216,52 @@ int main()
     hudPuntosTotales.setPosition(anchoVentana - 200, 30);
 
     RenderWindow window(VideoMode(anchoVentana, altoVentana), "Juego de Pesca 2D");
-    iniciarMusicaJuego("assets/Musica/Troubadeck 25 Deep Dark Sea.ogg");
+    iniciarMusicaJuego("assets/Musica/Troubadeck 54 Infinity.ogg");
+    
+    // Efectos de sonido (SFX)
+    SoundBuffer sfxCatchBuf, sfxTran1hBuf, sfxTran2Buf,sfxEsfuerzoBuf,sfxEfectojuegoBuf,sfxpanpescasteBuf,sfxrecompensaBuf,sfxvidamenosBuf,sfxjuegoperdidoBuf,sfxreinicioBuf,sfxruidoaguaBuf,sfxvictoriaBuf;
+    Sound sfxCatch, sfxTran1, sfxTran2,sfxEsfuerzo,sfxEfectojuego,sfxpanpescaste,sfxrecompensa,sfxvidamenos,sfxjuegoperdido, sfxreinicio,sfxruidoagua,sfxvictoria;
+
+    sfxCatchBuf.loadFromFile("assets/efectosonido/DSGNMisc_CAST-Bubblewrap_HY_PC-001.wav");
+    sfxTran1hBuf.loadFromFile("assets/efectosonido/DSGNMisc_INTERFACE-Phasey Swipe_HY_PC-006.wav");
+    sfxTran2Buf.loadFromFile("assets/efectosonido/MAGSpel_CAST-Underwater_HY_PC-004.wav");
+    sfxEsfuerzoBuf.loadFromFile("assets/efectosonido/Voice_Male_V2_Effort_Mono_06.wav");
+    sfxEfectojuegoBuf.loadFromFile("assets/efectosonido/Vehicle_Car_Button_Mono_02.wav"); 
+    sfxpanpescasteBuf.loadFromFile("assets/efectosonido/MAGSpel_CAST-Bubbly Gather_HY_PC-005.wav");
+    sfxrecompensaBuf.loadFromFile("assets/efectosonido/DSGNTonl_USABLE-Whimsy Coin_HY_PC-003.wav");
+    sfxvidamenosBuf.loadFromFile("assets/efectosonido/DSGNMisc_HIT-Bit Kick_HY_PC-002.wav");
+    sfxjuegoperdidoBuf.loadFromFile("assets/efectosonido/DSGNMisc_SKILL IMPACT-Bubbly Zaps_HY_PC-003.wav");
+    sfxreinicioBuf.loadFromFile("assets/efectosonido/DSGNMisc_INTERFACE-Phasey Swipe_HY_PC-006.wav");
+    sfxruidoaguaBuf.loadFromFile("assets/efectosonido/Ambiance_Sea_Loop_Stereo.wav");
+    sfxvictoriaBuf.loadFromFile("assets/efectosonido/winning-82808.wav");
+
+
+
+    sfxCatch.setBuffer(sfxCatchBuf);
+    sfxTran1.setBuffer(sfxTran1hBuf);
+    sfxTran2.setBuffer(sfxTran2Buf);
+    sfxEsfuerzo.setBuffer(sfxEsfuerzoBuf);
+    sfxEfectojuego.setBuffer(sfxEfectojuegoBuf);
+    sfxpanpescaste.setBuffer(sfxpanpescasteBuf);
+    sfxrecompensa.setBuffer(sfxrecompensaBuf);
+    sfxvidamenos.setBuffer(sfxvidamenosBuf);
+    sfxjuegoperdido.setBuffer(sfxjuegoperdidoBuf);
+    sfxreinicio.setBuffer(sfxreinicioBuf);
+    sfxruidoagua.setBuffer(sfxruidoaguaBuf);
+    sfxvictoria.setBuffer(sfxvictoriaBuf);
+
+    sfxCatch.setVolume(25.f);
+    sfxTran1.setVolume(25.f);
+    sfxTran2.setVolume(25.f);
+    sfxEsfuerzo.setVolume(100.f);
+    sfxEfectojuego.setVolume(85.f);
+    sfxpanpescaste.setVolume(40.f);
+    sfxrecompensa.setVolume(50.f);
+    sfxvidamenos.setVolume(60.f);
+    sfxjuegoperdido.setVolume(70.f);
+    sfxreinicio.setVolume(25.f);
+    sfxruidoagua.setVolume(30.f);
+    sfxvictoria.setVolume(70.f);
 
     Sprite spriteFondo(fondo);
     Sprite spriteFondo2(fondo2);
@@ -242,10 +288,13 @@ int main()
             if (estado == INICIO && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
                 estado = TRANSICION;
                 opacidad = 0;
+                sfxTran1.play();
             }
             // Reiniciar reto con Enter cuando el reto terminó (ganado o perdido) y estamos en JUEGO
             if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
                 if (!retoActivo && mostrarPezFisico) {
+                    // SFX de interfaz al confirmar con Enter (no reinicio)
+                    sfxTran1.play();
                     retoActivo = true;
                     retoGanado = false;
                     tiempoRetoRestante = tiempoRetoTotal;
@@ -255,6 +304,11 @@ int main()
             }
             // Salir de pantalla de recompensas con Enter
             if (estado == RECOMPENSAS && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
+                // Detener el bucle del SFX de recompensa al salir de recompensas
+                sfxrecompensa.setLoop(false);
+                sfxrecompensa.stop();
+                // SFX de interfaz al confirmar con Enter (no reinicio)
+                sfxTran1.play();
                 recompensaSeleccionada = nullptr;
                 mensajeReto.setString("");
                 
@@ -263,10 +317,25 @@ int main()
                     // ¡Victoria! Alcanzó la meta de puntos - ir directo a pantalla final
                     juegoTerminado = true;
                     estado = VICTORIA;
+                    // Detener ambiente de agua al finalizar el juego
+                    sfxruidoagua.setLoop(false);
+                    sfxruidoagua.stop();
+                    // SFX de victoria final del juego
+                    sfxvictoria.play();
+                    // SFX de interfaz para entrada a pantalla final
+                    sfxreinicio.play();
                 } else if (intentosRealizados >= intentosMaximos) {
                     // Se acabaron los intentos sin alcanzar la meta - ir directo a pantalla final
                     juegoTerminado = true;
                     estado = DERROTA;
+                    // Detener ambiente de agua al finalizar el juego
+                    sfxruidoagua.setLoop(false);
+                    sfxruidoagua.stop();
+                    // Reproducir SFX de juego perdido una sola vez
+                    sfxjuegoperdido.setLoop(false);
+                    sfxjuegoperdido.play();
+                    // SFX de interfaz para entrada a pantalla final
+                    sfxreinicio.play();
                 } else {
                     // Continuar jugando
                     estado = JUEGO;
@@ -282,6 +351,9 @@ int main()
                     tiempoRetoRestante = 0.0f;
                     tiempoContactoAcumulado = 0.0f;
                     cuadradoInicializado = false;
+                    // Reanudar ambiente de agua al volver al estado de juego
+                    sfxruidoagua.setLoop(true);
+                    sfxruidoagua.play();
                 }
                 // Importante: evitar que este mismo evento Enter dispare el reinicio inmediato
                 // en las pantallas finales (VICTORIA/DERROTA). Pasar al siguiente evento.
@@ -291,6 +363,11 @@ int main()
             if ((estado == VICTORIA || estado == DERROTA) && juegoTerminado && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
                 opacidad = 0;
                 estado = REINICIO_TRANSICION;
+                // Reproducir SFX de interfaz al reiniciar solo si es derrota final
+                if (estado == REINICIO_TRANSICION && juegoTerminado) {
+                    // Como estamos saliendo desde DERROTA (pantalla final), disparar el swipe
+                    sfxTran1.play();
+                }
             }
             // Control de animación del pescador (solo SPACE)
             if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Space) {
@@ -299,6 +376,8 @@ int main()
                     mostrarPezFisico = false;
                     bucleFinalIniciado = false;
                     animacionBucleIniciada = false;
+                    sfxCatchPlayedForThisAnim = false;
+                    sfxEsfuerzo.play();
                     pescador.currentFrame = 3;
                     pescador.iniciarAnimacion(false);
                 }
@@ -339,6 +418,12 @@ if (estado == INICIO) {
             }
             pescador.update();
             window.draw(pescador.obtenerSprite());
+
+            // Reproducir efecto de sonido cuando la animación alcance el frame 6
+            if (!sfxCatchPlayedForThisAnim && pescador.getFrameActual() >= 7) {
+                sfxCatch.play();
+                sfxCatchPlayedForThisAnim = true;
+            }
             
             // Las físicas simples del pez se manejan directamente cuando aparece
             
@@ -377,6 +462,9 @@ if (estado == INICIO) {
                     tiempoRetoRestante = tiempoRetoTotal;
                     tiempoContactoAcumulado = 0.0f;
                     relojReto.restart();
+                    // Iniciar SFX de mecánicas en bucle mientras están activas
+                    sfxEfectojuego.setLoop(true);
+                    sfxEfectojuego.play();
                 }
                 
                 // Mostrar mecánica de juego
@@ -482,6 +570,10 @@ if (estado == INICIO) {
                         if (tiempoContactoAcumulado >= tiempoContactoNecesario) {
                             retoGanado = true;
                             retoActivo = false;
+                            // Detener sonido de mecánicas al ganar
+                            sfxEfectojuego.setLoop(false);
+                            sfxEfectojuego.stop();
+                            sfxCatch.play();
                             
                             // Contar intento exitoso y agregar puntos
                             intentosRealizados++;
@@ -500,6 +592,7 @@ if (estado == INICIO) {
                             // Ir a pantalla de victoria primero (individual, no final)
                             estado = VICTORIA;
                             timerVictoria.restart();
+                            // Quitar reproducción de recompensa aquí; solo en RECOMPENSAS
                             // Intentar carga directa por ruta para evitar problemas de sprite interno
                             if (!r.imagePath.empty()) {
                                 if (recompensaTexture.loadFromFile(r.imagePath)) {
@@ -531,7 +624,7 @@ if (estado == INICIO) {
                             textoRecompensaMultiplicador.setCharacterSize(36);
                             textoRecompensaMultiplicador.setFillColor(Color(255, 150, 50)); // Naranja
                             char multBuffer[128];
-                            std::snprintf(multBuffer, sizeof(multBuffer), "¡%s de %.1fkg! ×%.2f = %dpts", 
+                            std::snprintf(multBuffer, sizeof(multBuffer), "%s de %.1fkg! x%.2f = %dpts", 
                                          r.displayName.c_str(), r.actualWeight, r.multiplier, r.finalPoints);
                             textoRecompensaMultiplicador.setString(multBuffer);
                             FloatRect multBounds = textoRecompensaMultiplicador.getLocalBounds();
@@ -549,18 +642,32 @@ if (estado == INICIO) {
                         } else if (tiempoRetoRestante <= 0) {
                             retoActivo = false;
                             retoGanado = false;
+                            // Detener sonido de mecánicas al perder
+                            sfxEfectojuego.setLoop(false);
+                            sfxEfectojuego.stop();
                             
                             // Contar fallo e intento
                             fallosAcumulados++;
                             intentosRealizados++;
+                            // SFX para indicar que perdiste una vida/fallo
+                            sfxvidamenos.play();
                             
                             // Verificar si se acabaron los fallos permitidos
                             if (fallosAcumulados >= fallosMaximos) {
                                 juegoTerminado = true;
                                 estado = DERROTA;
+                                // Detener ambiente de agua al finalizar el juego por exceso de fallos
+                                sfxruidoagua.setLoop(false);
+                                sfxruidoagua.stop();
+                                // Reproducir SFX de juego perdido una sola vez
+                                sfxjuegoperdido.setLoop(false);
+                                sfxjuegoperdido.play();
                             } else {
                                 // Continuar jugando, mostrar mensaje de fallo temporal
                                 estado = DERROTA;
+                                // Detener ambiente de agua mientras se muestra el mensaje de fallo
+                                sfxruidoagua.setLoop(false);
+                                sfxruidoagua.stop();
                                 timerDerrota.restart();
                             }
                         }
@@ -664,7 +771,7 @@ if (estado == INICIO) {
                 // Victoria final del juego
                 Text victoriaTexto;
                 victoriaTexto.setFont(texto.getFont());
-                victoriaTexto.setString("¡FELICIDADES!\n¡Alcanzaste la meta!");
+                victoriaTexto.setString("FELICIDADES!\nAlcanzaste la meta!");
                 victoriaTexto.setCharacterSize(60);
                 victoriaTexto.setFillColor(Color(0, 255, 0)); // Verde
                 FloatRect vBounds = victoriaTexto.getLocalBounds();
@@ -703,7 +810,7 @@ if (estado == INICIO) {
                 // Victoria de un solo pez (juegoTerminado = false)
                 Text victoriaTexto;
                 victoriaTexto.setFont(texto.getFont());
-                victoriaTexto.setString("¡Has pescado!");
+                victoriaTexto.setString("Has pescado!");
                 victoriaTexto.setCharacterSize(72);
                 victoriaTexto.setFillColor(Color(0, 255, 0)); // Verde
                 FloatRect vBounds = victoriaTexto.getLocalBounds();
@@ -714,6 +821,12 @@ if (estado == INICIO) {
                 // Transición automática después de 3 segundos solo para victorias individuales
                 if (!juegoTerminado && timerVictoria.getElapsedTime().asSeconds() >= tiempoMostrarMensaje) {
                     estado = RECOMPENSAS;
+                    // Detener ambiente de agua al entrar a la pantalla de recompensa
+                    sfxruidoagua.setLoop(false);
+                    sfxruidoagua.stop();
+                    // Reproducir SFX de recompensa una sola vez al entrar a la tarjeta
+                    sfxrecompensa.setLoop(false);
+                    sfxrecompensa.play();
                 }
             }
         } else if (estado == DERROTA) {
@@ -725,9 +838,9 @@ if (estado == INICIO) {
                 Text derrotaTexto;
                 derrotaTexto.setFont(texto.getFont());
                 if (fallosAcumulados >= fallosMaximos) {
-                    derrotaTexto.setString("¡JUEGO TERMINADO!\nDemasiados fallos");
+                    derrotaTexto.setString("JUEGO TERMINADO!\nDemasiados fallos");
                 } else {
-                    derrotaTexto.setString("¡JUEGO TERMINADO!\nNo alcanzaste la meta");
+                    derrotaTexto.setString("JUEGO TERMINADO!\nNo alcanzaste la meta");
                 }
                 derrotaTexto.setCharacterSize(50);
                 derrotaTexto.setFillColor(Color(220, 60, 60)); // Rojo
@@ -794,6 +907,9 @@ if (estado == INICIO) {
                     tiempoContactoAcumulado = 0.0f;
                     cuadradoInicializado = false;
                     mensajeReto.setString("");
+                    // Reanudar ambiente de agua al volver al estado de juego
+                    sfxruidoagua.setLoop(true);
+                    sfxruidoagua.play();
                 }
             }
         }
@@ -819,6 +935,7 @@ if (estado == INICIO) {
         
         // Estado de instrucciones
         else if (estado == INSTRUCCIONES) {
+            detenerMusicaJuego();
             window.clear(Color::Black);
             window.draw(textoInstrucciones);
             
@@ -826,6 +943,9 @@ if (estado == INICIO) {
             if (timerInstrucciones.getElapsedTime().asSeconds() >= tiempoInstrucciones) {
                 estado = TRANSICION_FINAL;
                 opacidad = 0;
+                // Iniciar SFX en bucle durante la transición para que se note
+                sfxTran2.setLoop(true);
+                sfxTran2.play();
             }
         }
         
@@ -842,9 +962,16 @@ if (estado == INICIO) {
                 window.draw(fadeRect);
                 window.display();
                 sf::sleep(sf::milliseconds(250));
+                // Detener el bucle del SFX al finalizar la transición
+                sfxTran2.setLoop(false);
                 estado = JUEGO;
+                // Iniciar ambiente de agua en bucle durante el estado de juego
+                sfxruidoagua.setLoop(true);
+                sfxruidoagua.play();
                 animacionCortaMostrada = false;
                 fadeRect.setFillColor(Color(0, 0, 0, 0));
+                // Preparar flag para evitar repetición temprana
+                sfxCatchPlayedForThisAnim = false;
                 continue;
             }
         }
@@ -864,6 +991,15 @@ if (estado == INICIO) {
                 juegoTerminado = false;
                 retoActivo = false;
                 retoGanado = false;
+                // Asegurar que el SFX de mecánicas esté detenido
+                sfxEfectojuego.setLoop(false);
+                sfxEfectojuego.stop();
+                // Detener SFX de juego perdido si estaba en bucle
+                sfxjuegoperdido.setLoop(false);
+                sfxjuegoperdido.stop();
+                // Detener ambiente de agua si estaba activo
+                sfxruidoagua.setLoop(false);
+                sfxruidoagua.stop();
                 animacionTerminada = false;
                 mostrarPezFisico = false;
                 bucleFinalIniciado = false;
@@ -876,6 +1012,8 @@ if (estado == INICIO) {
                 recompensaSeleccionada = nullptr;
                 // Ir a inicio y limpiar fundido
                 estado = INICIO;
+                // Reproducir música del menú solo en pantalla de inicio
+                iniciarMusicaJuego("assets/Musica/Troubadeck 54 Infinity.ogg");
                 fadeRect.setFillColor(Color(0, 0, 0, 0));
                 continue;
             }

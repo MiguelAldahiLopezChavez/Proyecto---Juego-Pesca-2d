@@ -137,12 +137,12 @@ float RewardManager::generateWeightInRange(float minWeight, float maxWeight) {
 }
 
 float RewardManager::calculateMultiplier(float actualWeight, float minWeight, float maxWeight) {
-    // Fórmula ajustada: multiplicador = 0.7 + (porcentajeDelPeso * 0.8)
-    // Rango resultante: [0.7, 1.5]
+    // Fórmula ajustada: multiplicador = 0.7 + (porcentajeDelPeso * 1.1)
+    // Rango resultante: [0.7, 1.8]
     float weightPercentage = (actualWeight - minWeight) / (maxWeight - minWeight);
     if (weightPercentage < 0.0f) weightPercentage = 0.0f;
     if (weightPercentage > 1.0f) weightPercentage = 1.0f;
-    return 0.7f + (weightPercentage * 0.8f);
+    return 0.7f + (weightPercentage * 1.1f);
 }
 
 int RewardManager::calculateFinalPoints(int basePoints, float multiplier) {
