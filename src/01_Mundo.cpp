@@ -1,3 +1,6 @@
+// 01_Mundo.cpp
+// Archivo principal del juego: inicializa recursos, gestiona la ventana,
+// el bucle principal y las transiciones entre pantallas.
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <math.h>
@@ -8,8 +11,10 @@
 using namespace sf;
 
 
+// Función principal: crea la ventana, carga recursos, y ejecuta el loop principal.
 int main()
 {
+    // Textura para el sprite del pez usado en la mecánica (imagen pequeña/placeholder)
     Texture pez_mec;
          if (!pez_mec.loadFromFile("assets/imagen/nuevaimagen/iamgenpez_mecanicajuego.png")) 
      {
@@ -22,11 +27,14 @@ int main()
      spritePezMec.setScale(escalaPezMec, escalaPezMec);
 
     // Crear rectángulo verde (más alargado en Y)
+    // Este rectángulo actúa como la "barra" o área que debe tocar el pez
+    // para sumar tiempo de contacto en el sistema de reto.
     RectangleShape cuadradoVerdeShape(Vector2f(90, 120)); // Más alto que ancho
     cuadradoVerdeShape.setFillColor(Color::Green);
     cuadradoVerdeShape.setOrigin(45, 60); // Centrar el origen (mitad del tamaño)
 
-    Texture mecanica_juego;
+        // Textura que contiene la mecánica principal (panel donde se mueve el pez)
+        Texture mecanica_juego;
          if (!mecanica_juego.loadFromFile("assets/imagen/nuevaimagen/mecanica_juego_principal_2.png")) 
      {
     
@@ -35,7 +43,8 @@ int main()
 
      Sprite spriteMecanicaJuego(mecanica_juego);
      
-     // Variables de control
+    // Variables de control generales: timers y flags para controlar
+    // la secuencia de animaciones y la aparición de la mecánica.
      Clock timerAnimacion;
      Clock timerInstrucciones;
      bool animacionTerminada = false;
@@ -46,20 +55,22 @@ int main()
      
 
 
-    Texture fondo;
+     // Fondos: `fondo` usado para la pantalla inicial/menu, `fondo2` para la escena de juego
+     Texture fondo;
        if (!fondo.loadFromFile("assets/imagen/Background.png")) 
     {
 
         return -1;
     }   
 
-    Texture fondo2;
+        Texture fondo2;
          if (!fondo2.loadFromFile("assets/imagen/nuevaimagen/background.png")) 
      {
     
           return -1;
      }
 
+     // Textura de la sombra del pescador (decorativa, se dibuja bajo el sprite)
      Texture sombrapescador;
         if (!sombrapescador.loadFromFile("assets/imagen/nuevaimagen/sombra.png")) 
         {
@@ -70,6 +81,7 @@ int main()
     
 
 
+    // Determinar tamaño de ventana a partir del fondo principal
     Vector2u size = fondo.getSize();
     unsigned int anchoVentana = size.x;
     unsigned int altoVentana = size.y;
@@ -83,6 +95,7 @@ int main()
     spriteSombra.setPosition(505, 460);
     
     // Variables para el cuadrado verde (con gravedad)
+    // Controlan posición, velocidad, y límites para la física simple.
     float cuadradoX = 0;
     float cuadradoY = 0;
     float cuadradoVelocidadY = 0; // Velocidad actual de caída (+ = abajo, - = arriba)
@@ -94,6 +107,8 @@ int main()
     bool cuadradoInicializado = false;
     
     // Variables para movimiento simple del pez
+    // `pezPosX/pezPosY` determinan la posición, `pezVelocidadY` controla la velocidad vertical,
+    // `pezDireccion` indica sentido (1 abajo, -1 arriba) y valores min/max limitan la velocidad.
     float pezPosX = 0.0f;
     float pezPosY = 0.0f;
     // Velocidades del pez en píxeles/segundo (con movimiento escalado por dt)
@@ -107,6 +122,7 @@ int main()
     bool mousePresionado = false; 
 
 
+    // Hoja de sprites del pescador: usada por la clase `Pescador` para animaciones
     Texture pescadoranim;
     if (!pescadoranim.loadFromFile("assets/imagen/nuevaimagen/cast bobbin Sheet.png")) {
         return -1;
@@ -119,7 +135,8 @@ int main()
     bool bucleFinalIniciado = false;
     bool sfxCatchPlayedForThisAnim = false; // reproducir sfx desde frame 6 una sola vez por animación
 
-    // Sistema de reto: 15s para acumular 3s de contacto pez-rectángulo
+    // Sistema de reto: tiempo total para acumular cierta cantidad de contacto
+    // entre el cuadrado verde y el pez. Controla victoria/fallo por intento.
     bool retoActivo = false;
     bool retoGanado = false;
     float tiempoRetoTotal = 8.0f;
@@ -128,12 +145,12 @@ int main()
     float tiempoContactoNecesario = 5.0f;
     Clock relojReto;
     
-    // Timers para mensajes automáticos
+    // Timers para mostrar mensajes automáticos (victoria/derrota breves)
     Clock timerVictoria;
     Clock timerDerrota;
     float tiempoMostrarMensaje = 3.0f; // 3 segundos para mostrar mensajes
     
-    // Sistema de juego: 10 intentos, 3 fallos máx, 1000 pts meta
+    // Sistema de juego: intentos limitados, fallos permitidos y objetivo de puntos
     int intentosRealizados = 0;
     int intentosMaximos = 5;
     int fallosAcumulados = 0;
@@ -142,6 +159,7 @@ int main()
     int puntosMeta = 1000;
     bool juegoTerminado = false;
 
+    // Cargar fuente con `controlTexto` (wrapper simple sobre `sf::Font`)
     controlTexto texto;
     texto.loadFont("assets/Letras/opcion 1/Bear Days.ttf");
 
@@ -164,12 +182,14 @@ int main()
     Text hudIntentos;        // HUD arriba del pescador "X/10"
     Text hudPuntosTotales;   // HUD esquina sup. derecha "X/1000"
 
+    // Reloj auxiliar para parpadeo de textos en pantalla
     Clock reloj;
     bool mostrarTexto1Visible = true;
     float intervaloparpadeo =0.3f;
     bool animacionCortaMostrada = false;
     
 
+    // Preparar textos para menú, instrucciones y HUD
     mostrarTexto.setFont(texto.getFont());
     mostrarTexto.setString("Pesca2D");
     mostrarTexto.setCharacterSize(200); 
@@ -215,13 +235,15 @@ int main()
     hudPuntosTotales.setFillColor(Color(255, 215, 0)); // Dorado
     hudPuntosTotales.setPosition(anchoVentana - 200, 30);
 
+    // Crear ventana con el tamaño extraído del fondo y comenzar la música del menú
     RenderWindow window(VideoMode(anchoVentana, altoVentana), "Juego de Pesca 2D");
     iniciarMusicaJuego("assets/Musica/Troubadeck 54 Infinity.ogg");
     
-    // Efectos de sonido (SFX)
+    // Efectos de sonido (SFX): cargar buffers y asociarlos a `Sound` para su reproducción
     SoundBuffer sfxCatchBuf, sfxTran1hBuf, sfxTran2Buf,sfxEsfuerzoBuf,sfxEfectojuegoBuf,sfxpanpescasteBuf,sfxrecompensaBuf,sfxvidamenosBuf,sfxjuegoperdidoBuf,sfxreinicioBuf,sfxruidoaguaBuf,sfxvictoriaBuf;
     Sound sfxCatch, sfxTran1, sfxTran2,sfxEsfuerzo,sfxEfectojuego,sfxpanpescaste,sfxrecompensa,sfxvidamenos,sfxjuegoperdido, sfxreinicio,sfxruidoagua,sfxvictoria;
 
+    // Cargar cada archivo de efecto en su buffer correspondiente
     sfxCatchBuf.loadFromFile("assets/efectosonido/DSGNMisc_CAST-Bubblewrap_HY_PC-001.wav");
     sfxTran1hBuf.loadFromFile("assets/efectosonido/DSGNMisc_INTERFACE-Phasey Swipe_HY_PC-006.wav");
     sfxTran2Buf.loadFromFile("assets/efectosonido/MAGSpel_CAST-Underwater_HY_PC-004.wav");
@@ -237,6 +259,7 @@ int main()
 
 
 
+    // Asociar los buffers cargados a objetos `Sound` y ajustar volúmenes por defecto
     sfxCatch.setBuffer(sfxCatchBuf);
     sfxTran1.setBuffer(sfxTran1hBuf);
     sfxTran2.setBuffer(sfxTran2Buf);
@@ -263,9 +286,11 @@ int main()
     sfxruidoagua.setVolume(30.f);
     sfxvictoria.setVolume(70.f);
 
+    // Sprites para los fondos (pantalla inicial y escena de juego)
     Sprite spriteFondo(fondo);
     Sprite spriteFondo2(fondo2);
 
+    // Estados de pantalla que controla el flujo del juego
     enum EstadoPantalla { INICIO, TRANSICION, INSTRUCCIONES, TRANSICION_FINAL, JUEGO, VICTORIA, DERROTA, RECOMPENSAS, REINICIO_TRANSICION };
     EstadoPantalla estado = INICIO;
 
@@ -274,12 +299,13 @@ int main()
     fadeRect.setFillColor(Color(0, 0, 0, 0));
 
 
-    // Reloj persistente para delta time correcto
+    // Reloj persistente para calcular `dt` (delta time) y mantener físicas independientes del FPS
     Clock relojDelta;
     while (window.isOpen())
     {
         float dt = relojDelta.restart().asSeconds();
 
+        // Procesamiento de eventos (entrada de usuario)
         Event event;
         while (window.pollEvent(event))
         {
@@ -302,7 +328,7 @@ int main()
                     mensajeReto.setString("");
                 }
             }
-            // Salir de pantalla de recompensas con Enter
+            // Salir de pantalla de recompensas con Enter: detener efectos, evaluar condiciones finales
             if (estado == RECOMPENSAS && event.type == Event::KeyPressed && event.key.code == Keyboard::Enter) {
                 // Detener el bucle del SFX de recompensa al salir de recompensas
                 sfxrecompensa.setLoop(false);
@@ -369,7 +395,7 @@ int main()
                     sfxTran1.play();
                 }
             }
-            // Control de animación del pescador (solo SPACE)
+            // Control de animación del pescador (SPACE): inicia la animación completa
             if (estado == JUEGO && event.type == Event::KeyPressed && event.key.code == Keyboard::Space) {
                 if (!animacionTerminada || !mostrarPezFisico) {
                     animacionTerminada = false;
@@ -382,7 +408,7 @@ int main()
                     pescador.iniciarAnimacion(false);
                 }
             }
-            // Control de salto del cuadrado verde (UP arrow y mouse click)
+            // Control de salto del cuadrado verde (UP arrow y mouse click): aplica impulso hacia arriba
             if (estado == JUEGO && ((event.type == Event::KeyPressed && event.key.code == Keyboard::Up) ||
                 (event.type == Event::MouseButtonPressed && event.mouseButton.button == Mouse::Left))) {
                 if (animacionTerminada && mostrarPezFisico && cuadradoInicializado) {
@@ -396,13 +422,15 @@ int main()
             mostrarTexto1Visible = !mostrarTexto1Visible;
             reloj.restart();
         }
+        // Dibujado inicial: limpiar pantalla y dibujar el fondo por defecto
         window.clear();
         window.draw(spriteFondo);
 
 
 
 
-if (estado == INICIO) {
+        // Lógica por estados: menú inicial, juego, recompensas, victoria y derrota
+        if (estado == INICIO) {
             // Pantalla normal de inicio
             window.draw(mostrarTexto);
             if (mostrarTexto1Visible) {
@@ -410,6 +438,8 @@ if (estado == INICIO) {
             }
 
         } else if (estado == JUEGO) {
+            // Estado principal de juego: actualizar animaciones, físicas simples,
+            // detectar contacto pez-cuadrado y gestionar el sistema de reto.
             window.clear();
             window.draw(spriteFondo2);
             // Inicia el bucle de los primeros 3 frames solo si no hay animación activa
@@ -428,13 +458,14 @@ if (estado == INICIO) {
             // Las físicas simples del pez se manejan directamente cuando aparece
             
             // Detectar cuando termina la animación completa del pescador
-            // La animación termina cuando está en el bucle final (frames 8-10)
+            // La animación se considera "terminada" cuando entra en el bucle final (frames 8-10)
             if (!animacionTerminada && pescador.isEnBucleFinal()) {
                 animacionTerminada = true;
                 timerAnimacion.restart();
             }
                         
             // Mostrar mecánica de juego y activar sistemas cuando termina la animación
+            // Cuando la animación ha terminado, inicializar y mostrar la mecánica del reto
             if (animacionTerminada) {
                 // Inicializar sistemas la primera vez que se detecta el fin de animación
                 if (!mostrarPezFisico) {
@@ -454,6 +485,7 @@ if (estado == INICIO) {
                     cuadradoVelocidadY = 0; // Empezar sin velocidad inicial
                     
                     
+                    // Activar banderas que permiten que las físicas y el HUD se dibujen
                     cuadradoInicializado = true;
                     mostrarPezFisico = true;
                     // Iniciar reto al mostrar la mecánica y entidades
@@ -471,6 +503,7 @@ if (estado == INICIO) {
                 window.draw(spriteMecanicaJuego);
                 
                 if (cuadradoInicializado) {
+                    // === MOVIMIENTO DEL PEZ Y FÍSICAS DEL CUADRADO ===
                     // === MOVIMIENTO SIMPLE DEL PEZ ===
                     // Obtener límites para el pez
                     Vector2f posMecanica = spriteMecanicaJuego.getPosition();
@@ -545,7 +578,7 @@ if (estado == INICIO) {
                         cuadradoVelocidadY = 0; // Detener completamente en el límite inferior
                     }
                     
-                    // Dibujar cuadrado verde en su posición actual
+                    // Dibujar cuadrado verde en su posición actual (barrita que detecta contacto)
                     cuadradoVerdeShape.setPosition(cuadradoX, cuadradoY);
                     window.draw(cuadradoVerdeShape);
                     window.draw(spritePezMec);
@@ -562,11 +595,12 @@ if (estado == INICIO) {
                         FloatRect rectPez = spritePezMec.getGlobalBounds();
                         bool enContacto = rectCuadrado.intersects(rectPez);
 
+                        // Si hay intersección entre el rectángulo y el pez acumulamos tiempo de contacto
                         if (enContacto) {
                             tiempoContactoAcumulado += dt;
                         }
 
-                        // Comprobar victoria/derrota y preparar mensaje
+                        // Comprobar victoria/derrota y preparar mensaje (cuando se cumple tiempo de contacto o se agota el tiempo)
                         if (tiempoContactoAcumulado >= tiempoContactoNecesario) {
                             retoGanado = true;
                             retoActivo = false;
@@ -578,7 +612,7 @@ if (estado == INICIO) {
                             // Contar intento exitoso y agregar puntos
                             intentosRealizados++;
                             
-                            // Preparar recompensa y calcular puntos
+                            // Preparar recompensa y calcular puntos para mostrar en la pantalla de recompensa
                             recompensaManager.loadDefaults();
                             const Reward& r = recompensaManager.pickRandom();
                             recompensaSeleccionada = &r;
@@ -619,7 +653,7 @@ if (estado == INICIO) {
                             FloatRect pesoBounds = textoRecompensaPeso.getLocalBounds();
                             textoRecompensaPeso.setOrigin(pesoBounds.left + pesoBounds.width/2.f, pesoBounds.top + pesoBounds.height/2.f);
                             
-                            // Configurar texto del multiplicador
+                            // Configurar texto del multiplicador y demás textos de la tarjeta de recompensa
                             textoRecompensaMultiplicador.setFont(texto.getFont());
                             textoRecompensaMultiplicador.setCharacterSize(36);
                             textoRecompensaMultiplicador.setFillColor(Color(255, 150, 50)); // Naranja
@@ -640,6 +674,7 @@ if (estado == INICIO) {
                             FloatRect puntosBounds = textoRecompensaPuntos.getLocalBounds();
                             textoRecompensaPuntos.setOrigin(puntosBounds.left + puntosBounds.width/2.f, puntosBounds.top + puntosBounds.height/2.f);
                         } else if (tiempoRetoRestante <= 0) {
+                            // Se acabó el tiempo del reto: fallo en el intento
                             retoActivo = false;
                             retoGanado = false;
                             // Detener sonido de mecánicas al perder
@@ -672,7 +707,7 @@ if (estado == INICIO) {
                             }
                         }
 
-                        // Actualizar HUD en pantalla (esquina sup. derecha y medio lado derecho)
+                        // Actualizar HUD en pantalla (tiempo restante, tiempo de contacto)
                         char buffer1[128];
                         std::snprintf(buffer1, sizeof(buffer1), "Tiempo: %.1fs", tiempoRetoRestante);
                         hudRetoTiempo.setString(buffer1);
@@ -707,7 +742,7 @@ if (estado == INICIO) {
                 }
             }
             
-            // Mostrar HUD de intentos y puntos siempre en el juego
+            // Mostrar HUD de intentos y puntos siempre en el juego (superpuestos a la mecánica)
             char intentosBuffer[32];
             std::snprintf(intentosBuffer, sizeof(intentosBuffer), "%d/%d", intentosRealizados, intentosMaximos);
             hudIntentos.setString(intentosBuffer);
@@ -719,6 +754,7 @@ if (estado == INICIO) {
             window.draw(hudIntentos);
             window.draw(hudPuntosTotales);
             
+            // Sombra del pescador dibujada bajo el sprite para profundidad
             window.draw(spriteSombra);
         } else if (estado == RECOMPENSAS) {
             // Pantalla de recompensas solo con fondo negro
@@ -933,7 +969,7 @@ if (estado == INICIO) {
             }
         }
         
-        // Estado de instrucciones
+        // Estado de instrucciones: mostrar texto y esperar tiempo para pasar a la siguiente transición
         else if (estado == INSTRUCCIONES) {
             detenerMusicaJuego();
             window.clear(Color::Black);

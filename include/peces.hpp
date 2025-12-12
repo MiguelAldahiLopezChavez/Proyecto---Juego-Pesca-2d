@@ -1,3 +1,6 @@
+// peces.hpp
+// Define las estructuras y la lógica básica para las "recompensas" del juego
+// (principalmente peces). Incluye la representación gráfica y cálculo de puntos.
 #ifndef PECES_HPP
 #define PECES_HPP
 
@@ -8,12 +11,13 @@
 using namespace sf;
 using namespace std;
 
-// Tipos de recompensa posibles
+// Tipos de recompensa posibles (actualmente solo peces).
 enum class RewardType {
 	Fish
 };
 
-// Datos de una recompensa (pez u objeto)
+// Datos de una recompensa (pez u objeto). Mantiene tanto información lógica
+// (puntos, rareza, peso) como recursos gráficos (`Texture` y `Sprite`).
 struct Reward {
 	RewardType type;
 	string id;          // identificador interno
@@ -30,25 +34,26 @@ struct Reward {
 	Sprite  sprite;      // sprite listo para dibujar
 };
 
-// Gestor de recompensas: carga y selecciona aleatoriamente
+// Gestor de recompensas: carga lista por defecto, selección aleatoria y
+// utilidades para cálculo de peso y puntos.
 class RewardManager {
 public:
-	// Cargar lista de recompensas disponibles
+	// Cargar lista de recompensas disponibles (popula `rewards`).
 	void loadDefaults();
 
-	// Selección una recompensa aleatoria ponderada por "rarity"
+	// Selección una recompensa aleatoria ponderada por "rarity".
 	const Reward& pickRandom();
 
-	// Generar peso aleatorio dentro del rango específico del pez
+	// Generar peso aleatorio dentro del rango específico del pez.
 	float generateWeightInRange(float minWeight, float maxWeight);
 
-	// Calcular multiplicador basado en peso relativo
+	// Calcular multiplicador basado en peso relativo dentro del rango.
 	float calculateMultiplier(float actualWeight, float minWeight, float maxWeight);
 
-	// Calcular puntos finales con multiplicador
+	// Calcular puntos finales con multiplicador aplicado.
 	int calculateFinalPoints(int basePoints, float multiplier);
 
-	// Acceso a todas
+	// Acceso a todas las recompensas cargadas.
 	const vector<Reward>& all() const { return rewards; }
 
 private:
